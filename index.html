@@ -403,11 +403,12 @@ function hello(name) {
         { key: "ArrowRight", run: selectNextWord },
         // Alt+Left/Right and Cmd+Left/Right also move by word (overriding the
         // default group-step / line-boundary bindings) so every horizontal
-        // arrow combo navigates word-wise in command mode.
-        { key: "Alt-ArrowLeft", run: selectPrevWord },
-        { key: "Alt-ArrowRight", run: selectNextWord },
-        { key: "Mod-ArrowLeft", run: selectPrevWord },
-        { key: "Mod-ArrowRight", run: selectNextWord },
+        // arrow combo navigates word-wise in command mode. Adding Shift to any
+        // of them extends the selection by word.
+        { key: "Alt-ArrowLeft", run: selectPrevWord, shift: selectGroupLeft },
+        { key: "Alt-ArrowRight", run: selectNextWord, shift: selectGroupRight },
+        { key: "Mod-ArrowLeft", run: selectPrevWord, shift: selectGroupLeft },
+        { key: "Mod-ArrowRight", run: selectNextWord, shift: selectGroupRight },
         // Up/Down move the word selection between lines.
         { key: "ArrowUp", run: selectWordUp },
         { key: "ArrowDown", run: selectWordDown },
