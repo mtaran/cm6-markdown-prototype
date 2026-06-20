@@ -23,6 +23,16 @@ README change, but if in doubt, update it.
 When you change functionality, update the relevant section of `README.md` (don't
 just append) so the listing stays accurate and well-organized.
 
+### Keep it minimal
+
+`README.md` must stay minimal — every word there for a reason. List **only**
+functionality that was deliberately built or specifically requested for this
+project. Do **not** document stock CodeMirror behavior that comes for free and
+wasn't specifically asked for (e.g. undo history, line numbers, code folding,
+bracket matching, autocompletion, search). When in doubt, leave it out. Prefer a
+short bullet per feature over prose; no "Running"/"Implementation notes"
+boilerplate unless it earns its place.
+
 ## Commit early and often — a change isn't "done" until it's merged
 
 - Commit in small, logical increments rather than batching everything into one
