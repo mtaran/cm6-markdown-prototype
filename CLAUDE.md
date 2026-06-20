@@ -43,6 +43,19 @@ change — do not ask which delivery method to use:
 3. Push the branch to `origin`.
 4. Open a PR with `gh`.
 5. Merge the PR (squash) and delete the branch.
+6. **Fast-forward `main` in the primary checkout to the merge commit.** Merging
+   the PR only advances `main` on the remote; the primary checkout's local
+   `main` still points at the old commit until you update it
+   (`git -C <primary-checkout> merge --ff-only origin/main`, or `git pull`).
+
+**Updating the primary checkout's `main` is part of the task — not optional.** A
+change is not really done while the primary working copy still shows the
+pre-merge state. When you work from a worktree, the worktree is thrown away but
+the primary checkout is what the user sees next, so it must end at the merge
+commit. (`gh pr merge --delete-branch` run from a worktree also fails its local
+cleanup with `'main' is already checked out` — delete the remote branch with
+`git push origin --delete <branch>` and fast-forward the primary checkout
+manually.)
 
 **Code review happens post-merge**, not as a blocking gate before merge, so
 merging your own PR as part of completing a task is expected. Committing
@@ -57,3 +70,6 @@ directly to `main` is not the standard flow.
   work in progress — never report it as complete.
 - Treat "done" as a claim about the merged state of the repository, not about
   your local working copy.
+- "Done" also requires that the **primary checkout's `main` has been
+  fast-forwarded to the merge commit** (see the delivery flow above). A merged
+  PR whose change is not yet reflected in the primary working copy is not done.
