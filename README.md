@@ -20,6 +20,11 @@ needs an internet connection.
     highlighted; **Alt-click** toggles a word's selection.
   - In insert mode, **Cmd+Left/Right** move by word (matching
     **Alt+Left/Right**) rather than jumping to the line start/end.
+- **Entity highlights** — attach a persistent gold highlight to text, with a
+  small **"entity"** label shown in the gap below the line. Press **`e`** in
+  command mode to highlight the current word selection(s); press **`Alt+e`** in
+  insert mode to highlight the word(s) the cursor is on. Highlights stick to
+  their text through edits.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
   **Cmd-click**.
 - **Automatic light/dark theme** that follows the OS `prefers-color-scheme` and

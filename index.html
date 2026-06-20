@@ -104,6 +104,36 @@
       html.insert-mode .cm-editor,
       html.insert-mode .cm-editor .cm-gutters { background-color: #2b2620 !important; }
     }
+
+    /* Entity highlight: gold background on the text, plus a small "entity"
+       label dropped into the gap below the line (the line gets extra
+       padding-bottom to make room). */
+    .cm-entity-line { padding-bottom: 1.3em; }
+    .cm-entity-highlight {
+      background-color: #ffd54a; /* gold */
+      border-radius: 2px;
+      position: relative;
+    }
+    .cm-entity-highlight::after {
+      content: "entity";
+      position: absolute;
+      left: 0;
+      top: 1.2em;
+      font-size: 0.7em;
+      line-height: 1.1;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: .04em;
+      background-color: #fff0a8; /* yellow */
+      color: #6b5300;
+      padding: 0 4px;
+      border-radius: 2px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    @media (prefers-color-scheme: dark) {
+      .cm-entity-highlight { background-color: #b8902a; color: #1c1400; }
+      .cm-entity-highlight::after { background-color: #6b5300; color: #ffe9a8; }
+    }
   </style>
 </head>
 <body>
@@ -119,8 +149,9 @@
     import {
       EditorView, keymap, lineNumbers, highlightActiveLineGutter,
       highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine,
+      Decoration,
     } from "@codemirror/view";
-    import { EditorState, EditorSelection, Compartment, Prec, Transaction } from "@codemirror/state";
+    import { EditorState, EditorSelection, Compartment, Prec, Transaction, StateField, StateEffect } from "@codemirror/state";
     import {
       foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
       bracketMatching, foldKeymap,
@@ -299,6 +330,68 @@ function hello(name) {
       };
     });
 
+    // --- Entity highlights ----------------------------------------------
+    // A persistent decoration (kept in a StateField so it maps through edits).
+    // Each highlight applies a gold mark to its text plus a line decoration on
+    // every line it touches so the "entity" label has room below the text.
+    const highlightMark = Decoration.mark({ class: "cm-entity-highlight" });
+    const highlightLine = Decoration.line({ class: "cm-entity-line" });
+    const addHighlights = StateEffect.define();
+
+    const highlightField = StateField.define({
+      create() { return Decoration.none; },
+      update(deco, tr) {
+        deco = deco.map(tr.changes);
+        for (const e of tr.effects) {
+          if (!e.is(addHighlights)) continue;
+          const adds = [];
+          const lineStarts = new Set();
+          for (const { from, to } of e.value) {
+            if (from >= to) continue;
+            adds.push(highlightMark.range(from, to));
+            for (let pos = from; pos <= to;) {
+              const line = tr.state.doc.lineAt(pos);
+              if (!lineStarts.has(line.from)) {
+                lineStarts.add(line.from);
+                adds.push(highlightLine.range(line.from));
+              }
+              if (line.to >= to) break;
+              pos = line.to + 1;
+            }
+          }
+          deco = deco.update({ add: adds, sort: true });
+        }
+        return deco;
+      },
+      provide: (f) => EditorView.decorations.from(f),
+    });
+
+    // Command mode: highlight the current (word) selection(s) as-is.
+    const highlightSelections = (v) => {
+      const ranges = v.state.selection.ranges
+        .filter((r) => !r.empty)
+        .map((r) => ({ from: r.from, to: r.to }));
+      if (!ranges.length) return false;
+      v.dispatch({ effects: addHighlights.of(ranges) });
+      return true;
+    };
+    // Insert mode: highlight the word(s) the cursor sits on. Each range is
+    // grown out to whole-word boundaries so a bare caret highlights its word.
+    const highlightWordsAtCursor = (v) => {
+      const ranges = [];
+      for (const r of v.state.selection.ranges) {
+        let from = r.from, to = r.to;
+        const wa = v.state.wordAt(from);
+        const wb = v.state.wordAt(to);
+        if (wa) from = Math.min(from, wa.from);
+        if (wb) to = Math.max(to, wb.to);
+        if (from < to) ranges.push({ from, to });
+      }
+      if (!ranges.length) return false;
+      v.dispatch({ effects: addHighlights.of(ranges) });
+      return true;
+    };
+
     function enterInsert() { setMode("insert"); return true; }
     function enterCommand() { setMode("command"); return true; }
 
@@ -321,12 +414,16 @@ function hello(name) {
         // Shift+Left/Right extend the selection by word (not by char).
         { key: "Shift-ArrowLeft", run: selectGroupLeft },
         { key: "Shift-ArrowRight", run: selectGroupRight },
+        // e attaches an entity Highlight to the current selection(s).
+        { key: "e", run: highlightSelections },
         { key: "i", run: enterInsert },
       ])),
     ];
     const insertExtensions = [
       Prec.high(keymap.of([
         { key: "Escape", run: enterCommand },
+        // Alt+e highlights the word(s) the cursor is currently on.
+        { key: "Alt-e", run: highlightWordsAtCursor },
         // Cmd+Left/Right move by word (matching Alt+Left/Right) instead of the
         // default jump to line start/end; Shift extends the selection.
         { key: "Mod-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft },
@@ -365,6 +462,7 @@ function hello(name) {
           markdown({ base: markdownLanguage }),
           themeConf.of(themeExtension(mql.matches)),
           modeConf.of(commandExtensions),
+          highlightField,
           persist,
         ],
       }),
