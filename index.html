@@ -125,7 +125,7 @@
       foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
       bracketMatching, foldKeymap,
     } from "@codemirror/language";
-    import { history, defaultKeymap, historyKeymap, selectGroupLeft, selectGroupRight } from "@codemirror/commands";
+    import { history, defaultKeymap, historyKeymap, cursorGroupLeft, cursorGroupRight, selectGroupLeft, selectGroupRight } from "@codemirror/commands";
     import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
     import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
     import { lintKeymap } from "@codemirror/lint";
@@ -325,7 +325,13 @@ function hello(name) {
       ])),
     ];
     const insertExtensions = [
-      Prec.high(keymap.of([{ key: "Escape", run: enterCommand }])),
+      Prec.high(keymap.of([
+        { key: "Escape", run: enterCommand },
+        // Cmd+Left/Right move by word (matching Alt+Left/Right) instead of the
+        // default jump to line start/end; Shift extends the selection.
+        { key: "Mod-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft },
+        { key: "Mod-ArrowRight", run: cursorGroupRight, shift: selectGroupRight },
+      ])),
     ];
 
     let mode = "command";
