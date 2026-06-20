@@ -53,15 +53,6 @@
         --accent: #6e9bff;
       }
     }
-    /* Manual override classes beat the media query */
-    html.theme-light {
-      --bg: #ffffff; --bg-elev: #f5f6f8; --border: #e2e4e9;
-      --fg: #1f2328; --fg-muted: #636c76; --accent: #3b6df0;
-    }
-    html.theme-dark {
-      --bg: #0d1117; --bg-elev: #161b22; --border: #2a3038;
-      --fg: #e6edf3; --fg-muted: #9aa5b1; --accent: #6e9bff;
-    }
 
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
@@ -82,16 +73,8 @@
       border-bottom: 1px solid var(--border);
       flex: 0 0 auto;
     }
-    header h1 { font-size: 14px; font-weight: 600; margin: 0 auto 0 0; }
+    header h1 { font-size: 14px; font-weight: 600; margin: 0; }
     header .meta { color: var(--fg-muted); font-size: 12px; font-weight: 400; }
-
-    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .seg button {
-      appearance: none; border: 0; background: transparent; color: var(--fg-muted);
-      padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
-    }
-    .seg button + button { border-left: 1px solid var(--border); }
-    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 
     main { flex: 1 1 auto; min-height: 0; }
     .cm-editor { height: 100%; }
@@ -102,12 +85,6 @@
 <body>
   <header>
     <h1>Markdown Editor <span class="meta">· CodeMirror 6</span></h1>
-    <span class="meta" id="status">auto</span>
-    <div class="seg" role="group" aria-label="Theme">
-      <button data-theme="light" aria-pressed="false">Light</button>
-      <button data-theme="auto"  aria-pressed="true">Auto</button>
-      <button data-theme="dark"  aria-pressed="false">Dark</button>
-    </div>
   </header>
   <main id="editor"></main>
 
@@ -228,27 +205,11 @@ function hello(name) {
       parent: document.getElementById("editor"),
     });
 
-    // --- Theme control ---------------------------------------------------
-    // light | dark | auto. Seed from URL hash (#light/#dark) for easy demos.
-    let mode = ["light", "dark", "auto"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "auto";
-    const statusEl = document.getElementById("status");
-    const buttons = [...document.querySelectorAll(".seg button")];
+    // Theme follows the OS color scheme; swap the editor theme when it changes.
+    mql.addEventListener("change", () => {
+      view.dispatch({ effects: themeConf.reconfigure(themeExtension(mql.matches)) });
+    });
 
-    const resolvedDark = () => (mode === "auto" ? mql.matches : mode === "dark");
-
-    function applyTheme() {
-      const dark = resolvedDark();
-      document.documentElement.classList.remove("theme-light", "theme-dark");
-      if (mode !== "auto") document.documentElement.classList.add(dark ? "theme-dark" : "theme-light");
-      view.dispatch({ effects: themeConf.reconfigure(themeExtension(dark)) });
-      statusEl.textContent = mode === "auto" ? `auto (${dark ? "dark" : "light"})` : mode;
-      buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.theme === mode)));
-    }
-
-    buttons.forEach(b => b.addEventListener("click", () => { mode = b.dataset.theme; applyTheme(); }));
-    mql.addEventListener("change", () => { if (mode === "auto") applyTheme(); });
-
-    applyTheme();
     view.focus();
   </script>
 </body>
