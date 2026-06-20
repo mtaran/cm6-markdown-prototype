@@ -106,12 +106,13 @@
     }
 
     /* Entity highlight: gold background on the text, plus a small "entity"
-       label dropped into the gap below the line.
-       The highlighted line gets extra padding-bottom to reserve room for the
-       label. The selector doubles up both classes (.cm-line.cm-entity-line) so
-       it outranks CodeMirror's own `.cm-line { padding }` rule, which is
-       injected later and would otherwise reset padding-bottom to 0. */
-    .cm-line.cm-entity-line { padding-bottom: 1.6rem; }
+       label dropped into the gap below the text.
+       A highlighted line gets a taller line-height so EVERY visual row (the
+       logical line wraps, so padding-bottom on the block would only space the
+       last row) carries extra leading below its text for the label to sit in.
+       The selector doubles up both classes (.cm-line.cm-entity-line) so it
+       outranks CodeMirror's own `.cm-line` rule injected later. */
+    .cm-line.cm-entity-line { line-height: 2.8; }
     .cm-entity-highlight {
       background-color: #ffd54a; /* gold */
       border-radius: 2px;
@@ -121,10 +122,10 @@
       content: "entity";
       position: absolute;
       left: 0;
-      /* Anchor to the bottom of the text's line box (self-adjusts to the real
-         line height) and nudge down a hair so it clears the text cleanly. */
-      top: 100%;
-      margin-top: 0.15rem;
+      /* Sit just below the text glyphs of this row: 50% is the vertical centre
+         of the (tall) inline box, + ~0.6em reaches past the glyph bottom into
+         the leading. Self-adjusts per wrapped row. */
+      top: calc(50% + 0.6em);
       font-size: 0.72rem;
       line-height: 1.1;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
