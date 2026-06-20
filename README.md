@@ -18,6 +18,8 @@ needs an internet connection.
     **Shift+Left/Right** extend the selection by word.
   - The word under the cursor is selected, so its other occurrences are
     highlighted; **Alt-click** toggles a word's selection.
+  - In insert mode, **Cmd+Left/Right** move by word (matching
+    **Alt+Left/Right**) rather than jumping to the line start/end.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
   **Cmd-click**.
 - **Automatic light/dark theme** that follows the OS `prefers-color-scheme` and
