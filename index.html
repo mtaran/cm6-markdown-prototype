@@ -307,6 +307,47 @@ function hello(name) {
     const selectWordUp = (v) => selectWordVertical(v, false);
     const selectWordDown = (v) => selectWordVertical(v, true);
 
+    // --- Shift+arrow: grow the word selection outward --------------------
+    // Word selections keep both edges on word boundaries, so Shift grows the
+    // edge in the arrow's direction — by a whole word (Left/Right) or to the
+    // word nearest the column one line away (Up/Down). Growing outward (rather
+    // than moving a single head) keeps Shift+Left and Shift+Right symmetric and
+    // avoids collapsing the freshly selected word, which a plain head-move does.
+    const extendWordLeft = (v) => {
+      const main = v.state.selection.main;
+      const w = prevWordRange(v.state, main.from);
+      const from = w ? w.from : 0;
+      if (from === main.from) return true;
+      v.dispatch({ selection: EditorSelection.range(from, main.to), scrollIntoView: true, userEvent: "select" });
+      return true;
+    };
+    const extendWordRight = (v) => {
+      const main = v.state.selection.main;
+      const w = nextWordRange(v.state, main.to);
+      const to = w ? w.to : v.state.doc.length;
+      if (to === main.to) return true;
+      v.dispatch({ selection: EditorSelection.range(main.from, to), scrollIntoView: true, userEvent: "select" });
+      return true;
+    };
+    const extendLineUp = (v) => {
+      const main = v.state.selection.main;
+      const moved = v.moveVertically(EditorSelection.cursor(main.from), false);
+      const w = v.state.wordAt(moved.head);
+      const from = w ? w.from : moved.head;
+      if (from >= main.from) return true;
+      v.dispatch({ selection: EditorSelection.range(from, main.to), scrollIntoView: true, userEvent: "select" });
+      return true;
+    };
+    const extendLineDown = (v) => {
+      const main = v.state.selection.main;
+      const moved = v.moveVertically(EditorSelection.cursor(main.to), true);
+      const w = v.state.wordAt(moved.head);
+      const to = w ? w.to : moved.head;
+      if (to <= main.to) return true;
+      v.dispatch({ selection: EditorSelection.range(main.from, to), scrollIntoView: true, userEvent: "select" });
+      return true;
+    };
+
     // In command mode, snap any bare cursor (e.g. from a click or alt-click)
     // to the whole word at that position so it reads as a word selection.
     const snapToWords = EditorState.transactionFilter.of((tr) => {
@@ -399,22 +440,25 @@ function hello(name) {
       EditorState.readOnly.of(true),
       snapToWords,
       Prec.high(keymap.of([
-        { key: "ArrowLeft", run: selectPrevWord },
-        { key: "ArrowRight", run: selectNextWord },
-        // Alt+Left/Right and Cmd+Left/Right also move by word (overriding the
-        // default group-step / line-boundary bindings) so every horizontal
-        // arrow combo navigates word-wise in command mode. Adding Shift to any
-        // of them extends the selection by word.
-        { key: "Alt-ArrowLeft", run: selectPrevWord, shift: selectGroupLeft },
-        { key: "Alt-ArrowRight", run: selectNextWord, shift: selectGroupRight },
-        { key: "Mod-ArrowLeft", run: selectPrevWord, shift: selectGroupLeft },
-        { key: "Mod-ArrowRight", run: selectNextWord, shift: selectGroupRight },
-        // Up/Down move the word selection between lines.
-        { key: "ArrowUp", run: selectWordUp },
-        { key: "ArrowDown", run: selectWordDown },
-        // Shift+Left/Right extend the selection by word (not by char).
-        { key: "Shift-ArrowLeft", run: selectGroupLeft },
-        { key: "Shift-ArrowRight", run: selectGroupRight },
+        // Every horizontal arrow combo (plain / Alt / Cmd) moves the selection
+        // by word; every vertical combo moves the word selection between lines.
+        // Adding Shift to any of them grows the selection outward — by a word
+        // (Left/Right) or a line (Up/Down). Binding all three modifier variants
+        // to the same commands keeps the whole direction+modifier matrix
+        // coherent (and overrides CodeMirror's group-step / line-boundary /
+        // doc-start-end defaults).
+        { key: "ArrowLeft", run: selectPrevWord, shift: extendWordLeft },
+        { key: "Alt-ArrowLeft", run: selectPrevWord, shift: extendWordLeft },
+        { key: "Mod-ArrowLeft", run: selectPrevWord, shift: extendWordLeft },
+        { key: "ArrowRight", run: selectNextWord, shift: extendWordRight },
+        { key: "Alt-ArrowRight", run: selectNextWord, shift: extendWordRight },
+        { key: "Mod-ArrowRight", run: selectNextWord, shift: extendWordRight },
+        { key: "ArrowUp", run: selectWordUp, shift: extendLineUp },
+        { key: "Alt-ArrowUp", run: selectWordUp, shift: extendLineUp },
+        { key: "Mod-ArrowUp", run: selectWordUp, shift: extendLineUp },
+        { key: "ArrowDown", run: selectWordDown, shift: extendLineDown },
+        { key: "Alt-ArrowDown", run: selectWordDown, shift: extendLineDown },
+        { key: "Mod-ArrowDown", run: selectWordDown, shift: extendLineDown },
         // e attaches an entity Highlight to the current selection(s).
         { key: "e", run: highlightSelections },
         { key: "i", run: enterInsert },
