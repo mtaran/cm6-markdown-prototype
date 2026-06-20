@@ -53,15 +53,6 @@
         --accent: #6e9bff;
       }
     }
-    /* Manual override classes beat the media query */
-    html.theme-light {
-      --bg: #ffffff; --bg-elev: #f5f6f8; --border: #e2e4e9;
-      --fg: #1f2328; --fg-muted: #636c76; --accent: #3b6df0;
-    }
-    html.theme-dark {
-      --bg: #0d1117; --bg-elev: #161b22; --border: #2a3038;
-      --fg: #e6edf3; --fg-muted: #9aa5b1; --accent: #6e9bff;
-    }
 
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
@@ -82,32 +73,43 @@
       border-bottom: 1px solid var(--border);
       flex: 0 0 auto;
     }
-    header h1 { font-size: 14px; font-weight: 600; margin: 0 auto 0 0; }
+    header h1 { font-size: 14px; font-weight: 600; margin: 0; }
     header .meta { color: var(--fg-muted); font-size: 12px; font-weight: 400; }
 
-    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .seg button {
-      appearance: none; border: 0; background: transparent; color: var(--fg-muted);
-      padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+    /* Mode indicator (top-right) */
+    .mode {
+      margin-left: auto;
+      font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .08em;
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--fg-muted);
+      user-select: none;
     }
-    .seg button + button { border-left: 1px solid var(--border); }
-    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .mode[data-mode="insert"] { background: #fef9ef; color: #8a6d3b; border-color: #e7dcc3; }
+    @media (prefers-color-scheme: dark) {
+      .mode[data-mode="insert"] { background: #2b2620; color: #d9c79b; border-color: #4a4230; }
+    }
 
     main { flex: 1 1 auto; min-height: 0; }
     .cm-editor { height: 100%; }
     .cm-editor.cm-focused { outline: none; }
     .cm-scroller { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+
+    /* Insert mode: warm editor background (254 249 239), warm dark equivalent. */
+    html.insert-mode .cm-editor,
+    html.insert-mode .cm-editor .cm-gutters { background-color: #fef9ef !important; }
+    @media (prefers-color-scheme: dark) {
+      html.insert-mode .cm-editor,
+      html.insert-mode .cm-editor .cm-gutters { background-color: #2b2620 !important; }
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Markdown Editor <span class="meta">· CodeMirror 6</span></h1>
-    <span class="meta" id="status">auto</span>
-    <div class="seg" role="group" aria-label="Theme">
-      <button data-theme="light" aria-pressed="false">Light</button>
-      <button data-theme="auto"  aria-pressed="true">Auto</button>
-      <button data-theme="dark"  aria-pressed="false">Dark</button>
-    </div>
+    <div class="mode" id="mode" data-mode="command" title="i = insert · Esc = command">COMMAND</div>
   </header>
   <main id="editor"></main>
 
@@ -118,7 +120,7 @@
       EditorView, keymap, lineNumbers, highlightActiveLineGutter,
       highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine,
     } from "@codemirror/view";
-    import { EditorState, Compartment } from "@codemirror/state";
+    import { EditorState, EditorSelection, Compartment, Prec, Transaction } from "@codemirror/state";
     import {
       foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
       bracketMatching, foldKeymap,
@@ -146,7 +148,7 @@
       closeBrackets(),
       autocompletion(),
       highlightActiveLine(),
-      highlightSelectionMatches(),
+      highlightSelectionMatches({ wholeWords: true }),
       // Alt-click adds/removes cursors (Cmd-click kept working too).
       EditorView.clickAddsSelectionRange.of(e => e.altKey || e.metaKey),
       keymap.of([
@@ -214,6 +216,104 @@ function hello(name) {
 
     const themeExtension = (dark) => (dark ? oneDark : lightTheme);
 
+    // --- Command / Insert modes -----------------------------------------
+    // Command mode (default): read-only, word-wise navigation, and the word
+    // under the cursor is selected (so other occurrences get highlighted).
+    // Insert mode (press i to enter, Esc to leave): normal editing.
+    const modeConf = new Compartment();
+    const modeEl = document.getElementById("mode");
+
+    const isWordChar = (ch) => /[\p{L}\p{N}_]/u.test(ch);
+
+    // Word range after `from` (skips the current word, then the gap).
+    function nextWordRange(state, from) {
+      const text = state.doc.toString(), n = text.length;
+      let i = from;
+      while (i < n && isWordChar(text[i])) i++;
+      while (i < n && !isWordChar(text[i])) i++;
+      if (i >= n) return null;
+      const start = i;
+      while (i < n && isWordChar(text[i])) i++;
+      return EditorSelection.range(start, i);
+    }
+    // Word range before `from`.
+    function prevWordRange(state, from) {
+      const text = state.doc.toString();
+      let i = from;
+      while (i > 0 && isWordChar(text[i - 1])) i--;
+      while (i > 0 && !isWordChar(text[i - 1])) i--;
+      if (i <= 0) return null;
+      const end = i;
+      while (i > 0 && isWordChar(text[i - 1])) i--;
+      return EditorSelection.range(i, end);
+    }
+    const selectNextWord = (v) => {
+      const w = nextWordRange(v.state, v.state.selection.main.to);
+      if (!w) return false;
+      v.dispatch({ selection: w, scrollIntoView: true, userEvent: "select" });
+      return true;
+    };
+    const selectPrevWord = (v) => {
+      const w = prevWordRange(v.state, v.state.selection.main.from);
+      if (!w) return false;
+      v.dispatch({ selection: w, scrollIntoView: true, userEvent: "select" });
+      return true;
+    };
+
+    // In command mode, snap any bare cursor (e.g. from a click or alt-click)
+    // to the whole word at that position so it reads as a word selection.
+    const snapToWords = EditorState.transactionFilter.of((tr) => {
+      if (!tr.selection) return tr;
+      let changed = false;
+      const ranges = tr.newSelection.ranges.map((r) => {
+        if (!r.empty) return r;
+        const w = tr.state.wordAt(r.head);
+        if (!w) return r;
+        changed = true;
+        return EditorSelection.range(w.from, w.to);
+      });
+      if (!changed) return tr;
+      const ev = tr.annotation(Transaction.userEvent);
+      return {
+        changes: tr.changes,
+        selection: EditorSelection.create(ranges, tr.newSelection.mainIndex),
+        effects: tr.effects,
+        scrollIntoView: tr.scrollIntoView,
+        annotations: ev ? Transaction.userEvent.of(ev) : undefined,
+      };
+    });
+
+    function enterInsert() { setMode("insert"); return true; }
+    function enterCommand() { setMode("command"); return true; }
+
+    const commandExtensions = [
+      EditorState.readOnly.of(true),
+      snapToWords,
+      Prec.high(keymap.of([
+        { key: "ArrowLeft", run: selectPrevWord },
+        { key: "ArrowRight", run: selectNextWord },
+        { key: "i", run: enterInsert },
+      ])),
+    ];
+    const insertExtensions = [
+      Prec.high(keymap.of([{ key: "Escape", run: enterCommand }])),
+    ];
+
+    let mode = "command";
+    function setMode(next) {
+      mode = next;
+      const isInsert = mode === "insert";
+      modeEl.textContent = isInsert ? "INSERT" : "COMMAND";
+      modeEl.dataset.mode = mode;
+      document.documentElement.classList.toggle("insert-mode", isInsert);
+      const sel = view.state.selection.main;
+      // 1) swap the mode extensions; 2) (re)place the cursor under the new
+      // config — collapse to a caret for insert, snap to the word for command.
+      view.dispatch({ effects: modeConf.reconfigure(isInsert ? insertExtensions : commandExtensions) });
+      view.dispatch({ selection: { anchor: isInsert ? sel.from : sel.head } });
+      view.focus();
+    }
+
     const view = new EditorView({
       state: EditorState.create({
         doc,
@@ -222,33 +322,20 @@ function hello(name) {
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage }),
           themeConf.of(themeExtension(mql.matches)),
+          modeConf.of(commandExtensions),
           persist,
         ],
       }),
       parent: document.getElementById("editor"),
     });
 
-    // --- Theme control ---------------------------------------------------
-    // light | dark | auto. Seed from URL hash (#light/#dark) for easy demos.
-    let mode = ["light", "dark", "auto"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "auto";
-    const statusEl = document.getElementById("status");
-    const buttons = [...document.querySelectorAll(".seg button")];
+    // Theme follows the OS color scheme; swap the editor theme when it changes.
+    mql.addEventListener("change", () => {
+      view.dispatch({ effects: themeConf.reconfigure(themeExtension(mql.matches)) });
+    });
 
-    const resolvedDark = () => (mode === "auto" ? mql.matches : mode === "dark");
-
-    function applyTheme() {
-      const dark = resolvedDark();
-      document.documentElement.classList.remove("theme-light", "theme-dark");
-      if (mode !== "auto") document.documentElement.classList.add(dark ? "theme-dark" : "theme-light");
-      view.dispatch({ effects: themeConf.reconfigure(themeExtension(dark)) });
-      statusEl.textContent = mode === "auto" ? `auto (${dark ? "dark" : "light"})` : mode;
-      buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.theme === mode)));
-    }
-
-    buttons.forEach(b => b.addEventListener("click", () => { mode = b.dataset.theme; applyTheme(); }));
-    mql.addEventListener("change", () => { if (mode === "auto") applyTheme(); });
-
-    applyTheme();
+    // Start command mode with the first word selected.
+    selectNextWord(view);
     view.focus();
   </script>
 </body>
