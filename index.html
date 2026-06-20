@@ -342,48 +342,85 @@ function hello(name) {
     // line-height so the wrapped row it sits on has room for the label below.
     const highlightMark = Decoration.mark({ class: "cm-entity-highlight" });
     const addHighlights = StateEffect.define();
+    const removeHighlights = StateEffect.define();
+
+    // Two ranges overlap when each starts before the other ends.
+    const overlaps = (aFrom, aTo, bFrom, bTo) => aFrom < bTo && bFrom < aTo;
 
     const highlightField = StateField.define({
       create() { return Decoration.none; },
       update(deco, tr) {
         deco = deco.map(tr.changes);
         for (const e of tr.effects) {
-          if (!e.is(addHighlights)) continue;
-          const adds = e.value
-            .filter(({ from, to }) => from < to)
-            .map(({ from, to }) => highlightMark.range(from, to));
-          deco = deco.update({ add: adds, sort: true });
+          if (e.is(addHighlights)) {
+            const adds = e.value
+              .filter(({ from, to }) => from < to)
+              .map(({ from, to }) => highlightMark.range(from, to));
+            deco = deco.update({ add: adds, sort: true });
+          } else if (e.is(removeHighlights)) {
+            const rs = e.value;
+            deco = deco.update({
+              filter: (from, to) => !rs.some((r) => overlaps(from, to, r.from, r.to)),
+            });
+          }
         }
         return deco;
       },
       provide: (f) => EditorView.decorations.from(f),
     });
 
-    // Command mode: highlight the current (word) selection(s) as-is.
-    const highlightSelections = (v) => {
-      const ranges = v.state.selection.ranges
+    // Does any existing highlight overlap this range?
+    const rangeHighlighted = (state, r) => {
+      let hit = false;
+      state.field(highlightField).between(r.from, r.to, () => { hit = true; return false; });
+      return hit;
+    };
+
+    // Target ranges for the gesture: the current selection(s) as-is in command
+    // mode; in insert mode each range is grown to whole-word boundaries so a
+    // bare caret targets the word it sits on.
+    const selectionTargets = (state) =>
+      state.selection.ranges
         .filter((r) => !r.empty)
         .map((r) => ({ from: r.from, to: r.to }));
-      if (!ranges.length) return false;
-      v.dispatch({ effects: addHighlights.of(ranges) });
-      return true;
-    };
-    // Insert mode: highlight the word(s) the cursor sits on. Each range is
-    // grown out to whole-word boundaries so a bare caret highlights its word.
-    const highlightWordsAtCursor = (v) => {
+    const wordTargets = (state) => {
       const ranges = [];
-      for (const r of v.state.selection.ranges) {
+      for (const r of state.selection.ranges) {
         let from = r.from, to = r.to;
-        const wa = v.state.wordAt(from);
-        const wb = v.state.wordAt(to);
+        const wa = state.wordAt(from);
+        const wb = state.wordAt(to);
         if (wa) from = Math.min(from, wa.from);
         if (wb) to = Math.max(to, wb.to);
         if (from < to) ranges.push({ from, to });
       }
-      if (!ranges.length) return false;
-      v.dispatch({ effects: addHighlights.of(ranges) });
+      return ranges;
+    };
+
+    // Toggle: remove the highlight where a target already has one, else add it.
+    const toggle = (v, targets) => {
+      if (!targets.length) return false;
+      const add = [], remove = [];
+      for (const r of targets) (rangeHighlighted(v.state, r) ? remove : add).push(r);
+      const effects = [];
+      if (add.length) effects.push(addHighlights.of(add));
+      if (remove.length) effects.push(removeHighlights.of(remove));
+      v.dispatch({ effects });
       return true;
     };
+    // Remove-only (Backspace): drop any highlight overlapping a target. Returns
+    // false when there's nothing to remove so the key falls through to normal
+    // deletion.
+    const unhighlight = (v, targets) => {
+      const remove = targets.filter((r) => rangeHighlighted(v.state, r));
+      if (!remove.length) return false;
+      v.dispatch({ effects: removeHighlights.of(remove) });
+      return true;
+    };
+
+    const highlightSelections = (v) => toggle(v, selectionTargets(v.state));
+    const highlightWordsAtCursor = (v) => toggle(v, wordTargets(v.state));
+    const unhighlightSelections = (v) => unhighlight(v, selectionTargets(v.state));
+    const unhighlightWordsAtCursor = (v) => unhighlight(v, wordTargets(v.state));
 
     function enterInsert() { setMode("insert"); return true; }
     function enterCommand() { setMode("command"); return true; }
@@ -408,19 +445,27 @@ function hello(name) {
         // Shift+Left/Right extend the selection by word (not by char).
         { key: "Shift-ArrowLeft", run: selectGroupLeft },
         { key: "Shift-ArrowRight", run: selectGroupRight },
-        // e (or Cmd+e, matching insert mode) attaches an entity Highlight to
-        // the current selection(s).
+        // e (or Cmd+e, matching insert mode) toggles an entity Highlight on the
+        // current selection(s) — adds it, or removes it if already highlighted.
         { key: "e", run: highlightSelections },
         { key: "Mod-e", run: highlightSelections },
+        // Backspace / Cmd+Backspace remove the highlight on the selection(s).
+        { key: "Backspace", run: unhighlightSelections },
+        { key: "Mod-Backspace", run: unhighlightSelections },
         { key: "i", run: enterInsert },
       ])),
     ];
     const insertExtensions = [
       Prec.high(keymap.of([
         { key: "Escape", run: enterCommand },
-        // Cmd+e highlights the word(s) the cursor is currently on. (Alt+e is a
-        // dead key on macOS — it starts an accent sequence — so it's unusable.)
+        // Cmd+e toggles the highlight on the word(s) the cursor is on (adds, or
+        // removes if already highlighted). (Alt+e is a dead key on macOS — it
+        // starts an accent sequence — so it's unusable.)
         { key: "Mod-e", run: highlightWordsAtCursor },
+        // Backspace / Cmd+Backspace remove the highlight on the word at the
+        // cursor when present; otherwise they fall through to normal deletion.
+        { key: "Backspace", run: unhighlightWordsAtCursor },
+        { key: "Mod-Backspace", run: unhighlightWordsAtCursor },
         // Cmd+Left/Right move by word (matching Alt+Left/Right) instead of the
         // default jump to line start/end; Shift extends the selection.
         { key: "Mod-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft },

@@ -22,9 +22,11 @@ needs an internet connection.
     **Alt+Left/Right**) rather than jumping to the line start/end.
 - **Entity highlights** — attach a persistent gold highlight to text, with a
   small **"entity"** label shown in the gap below the line. In command mode
-  press **`e`** (or **`Cmd+e`**) to highlight the current word selection(s); in
-  insert mode press **`Cmd+e`** to highlight the word(s) the cursor is on.
-  Highlights stick to their text through edits.
+  press **`e`** (or **`Cmd+e`**) to toggle the highlight on the current word
+  selection(s); in insert mode press **`Cmd+e`** to toggle it on the word(s) the
+  cursor is on. The same gesture over already-highlighted text removes it, and
+  **`Backspace`** / **`Cmd+Backspace`** remove the highlight under the
+  cursor/selection. Highlights stick to their text through edits.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
   **Cmd-click**.
 - **Automatic light/dark theme** that follows the OS `prefers-color-scheme` and
