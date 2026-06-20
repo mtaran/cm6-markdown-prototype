@@ -306,11 +306,18 @@ function hello(name) {
       modeEl.textContent = isInsert ? "INSERT" : "COMMAND";
       modeEl.dataset.mode = mode;
       document.documentElement.classList.toggle("insert-mode", isInsert);
-      const sel = view.state.selection.main;
-      // 1) swap the mode extensions; 2) (re)place the cursor under the new
-      // config — collapse to a caret for insert, snap to the word for command.
+      const sel = view.state.selection;
+      // 1) swap the mode extensions; 2) (re)place every cursor under the new
+      // config — collapse each range to a caret for insert, snap each to the
+      // word for command. Preserve all ranges so multi-cursor survives the
+      // switch (e.g. Alt/Cmd-click cursors added in command mode).
       view.dispatch({ effects: modeConf.reconfigure(isInsert ? insertExtensions : commandExtensions) });
-      view.dispatch({ selection: { anchor: isInsert ? sel.from : sel.head } });
+      view.dispatch({
+        selection: EditorSelection.create(
+          sel.ranges.map((r) => EditorSelection.cursor(isInsert ? r.from : r.head)),
+          sel.mainIndex
+        ),
+      });
       view.focus();
     }
 
