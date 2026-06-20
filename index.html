@@ -259,6 +259,22 @@ function hello(name) {
       v.dispatch({ selection: w, scrollIntoView: true, userEvent: "select" });
       return true;
     };
+    // Move the selection one visual line up/down, then snap to the word nearest
+    // the cursor's column on the new line (a bare caret if it lands on blank
+    // space). Drives Up/Down in command mode.
+    function selectWordVertical(v, forward) {
+      const head = v.state.selection.main.head;
+      const moved = v.moveVertically(EditorSelection.cursor(head), forward);
+      const w = v.state.wordAt(moved.head);
+      v.dispatch({
+        selection: w ? EditorSelection.range(w.from, w.to) : EditorSelection.cursor(moved.head),
+        scrollIntoView: true,
+        userEvent: "select",
+      });
+      return true;
+    }
+    const selectWordUp = (v) => selectWordVertical(v, false);
+    const selectWordDown = (v) => selectWordVertical(v, true);
 
     // In command mode, snap any bare cursor (e.g. from a click or alt-click)
     // to the whole word at that position so it reads as a word selection.
@@ -292,6 +308,16 @@ function hello(name) {
       Prec.high(keymap.of([
         { key: "ArrowLeft", run: selectPrevWord },
         { key: "ArrowRight", run: selectNextWord },
+        // Alt+Left/Right and Cmd+Left/Right also move by word (overriding the
+        // default group-step / line-boundary bindings) so every horizontal
+        // arrow combo navigates word-wise in command mode.
+        { key: "Alt-ArrowLeft", run: selectPrevWord },
+        { key: "Alt-ArrowRight", run: selectNextWord },
+        { key: "Mod-ArrowLeft", run: selectPrevWord },
+        { key: "Mod-ArrowRight", run: selectNextWord },
+        // Up/Down move the word selection between lines.
+        { key: "ArrowUp", run: selectWordUp },
+        { key: "ArrowDown", run: selectWordDown },
         // Shift+Left/Right extend the selection by word (not by char).
         { key: "Shift-ArrowLeft", run: selectGroupLeft },
         { key: "Shift-ArrowRight", run: selectGroupRight },

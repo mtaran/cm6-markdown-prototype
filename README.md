@@ -13,8 +13,9 @@ needs an internet connection.
   word-oriented view; press **`i`** for insert mode (normal editing, warm
   background) and **`Esc`** to return. The current mode shows in a chip in the
   top-right.
-  - **Left/Right** move by word and select it; **Shift+Left/Right** extend the
-    selection by word.
+  - **Left/Right** (also **Alt+** and **Cmd+Left/Right**) move by word and
+    select it; **Up/Down** move the word selection between lines;
+    **Shift+Left/Right** extend the selection by word.
   - The word under the cursor is selected, so its other occurrences are
     highlighted; **Alt-click** toggles a word's selection.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
