@@ -31,5 +31,5 @@ needs an internet connection.
   **Cmd-click**.
 - **Automatic light/dark theme** that follows the OS `prefers-color-scheme` and
   updates live when it changes.
-- **Local autosave** — the document is persisted to `localStorage` and restored
-  on reload.
+- **Local autosave** — the document and its entity highlights are persisted to
+  `localStorage` and restored on reload.
