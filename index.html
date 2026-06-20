@@ -408,16 +408,19 @@ function hello(name) {
         // Shift+Left/Right extend the selection by word (not by char).
         { key: "Shift-ArrowLeft", run: selectGroupLeft },
         { key: "Shift-ArrowRight", run: selectGroupRight },
-        // e attaches an entity Highlight to the current selection(s).
+        // e (or Cmd+e, matching insert mode) attaches an entity Highlight to
+        // the current selection(s).
         { key: "e", run: highlightSelections },
+        { key: "Mod-e", run: highlightSelections },
         { key: "i", run: enterInsert },
       ])),
     ];
     const insertExtensions = [
       Prec.high(keymap.of([
         { key: "Escape", run: enterCommand },
-        // Alt+e highlights the word(s) the cursor is currently on.
-        { key: "Alt-e", run: highlightWordsAtCursor },
+        // Cmd+e highlights the word(s) the cursor is currently on. (Alt+e is a
+        // dead key on macOS — it starts an accent sequence — so it's unusable.)
+        { key: "Mod-e", run: highlightWordsAtCursor },
         // Cmd+Left/Right move by word (matching Alt+Left/Right) instead of the
         // default jump to line start/end; Shift extends the selection.
         { key: "Mod-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft },
