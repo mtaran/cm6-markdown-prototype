@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>CM6 Markdown Editor</title>
+
+  <!--
+    Import map dedupes @codemirror/* and @lezer/* across packages so a single
+    @codemirror/state instance is shared (mixing independently-pinned esm.sh
+    builds otherwise throws "multiple instances of @codemirror/state").
+    Leaf deps (style-mod, crelt, ...) are left bundled per-package — harmless.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@codemirror/state": "https://esm.sh/@codemirror/state@6.4.1",
+      "@codemirror/view": "https://esm.sh/@codemirror/view@6.26.0?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/language": "https://esm.sh/@codemirror/language@6.10.1?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.6.0?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/search": "https://esm.sh/@codemirror/search@6.5.6?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.16.0?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/lint": "https://esm.sh/@codemirror/lint@6.7.0?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@lezer/common": "https://esm.sh/@lezer/common@1.2.1",
+      "@lezer/highlight": "https://esm.sh/@lezer/highlight@1.2.0?external=@lezer/common",
+      "@lezer/lr": "https://esm.sh/@lezer/lr@1.4.1?external=@lezer/common",
+      "@lezer/markdown": "https://esm.sh/@lezer/markdown@1.3.0?external=@lezer/common,@lezer/highlight",
+      "codemirror": "https://esm.sh/codemirror@6.0.1?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/lang-markdown": "https://esm.sh/@codemirror/lang-markdown@6.3.0?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/autocomplete,@codemirror/search,@codemirror/lint,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/markdown",
+      "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark@6.1.2?external=@codemirror/state,@codemirror/view,@codemirror/language"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      /* Light palette (default) */
+      --bg: #ffffff;
+      --bg-elev: #f5f6f8;
+      --border: #e2e4e9;
+      --fg: #1f2328;
+      --fg-muted: #636c76;
+      --accent: #3b6df0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --bg-elev: #161b22;
+        --border: #2a3038;
+        --fg: #e6edf3;
+        --fg-muted: #9aa5b1;
+        --accent: #6e9bff;
+      }
+    }
+    /* Manual override classes beat the media query */
+    html.theme-light {
+      --bg: #ffffff; --bg-elev: #f5f6f8; --border: #e2e4e9;
+      --fg: #1f2328; --fg-muted: #636c76; --accent: #3b6df0;
+    }
+    html.theme-dark {
+      --bg: #0d1117; --bg-elev: #161b22; --border: #2a3038;
+      --fg: #e6edf3; --fg-muted: #9aa5b1; --accent: #6e9bff;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--bg-elev);
+      border-bottom: 1px solid var(--border);
+      flex: 0 0 auto;
+    }
+    header h1 { font-size: 14px; font-weight: 600; margin: 0 auto 0 0; }
+    header .meta { color: var(--fg-muted); font-size: 12px; font-weight: 400; }
+
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg button {
+      appearance: none; border: 0; background: transparent; color: var(--fg-muted);
+      padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+    }
+    .seg button + button { border-left: 1px solid var(--border); }
+    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+    main { flex: 1 1 auto; min-height: 0; }
+    .cm-editor { height: 100%; }
+    .cm-editor.cm-focused { outline: none; }
+    .cm-scroller { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Markdown Editor <span class="meta">· CodeMirror 6</span></h1>
+    <span class="meta" id="status">auto</span>
+    <div class="seg" role="group" aria-label="Theme">
+      <button data-theme="light" aria-pressed="false">Light</button>
+      <button data-theme="auto"  aria-pressed="true">Auto</button>
+      <button data-theme="dark"  aria-pressed="false">Dark</button>
+    </div>
+  </header>
+  <main id="editor"></main>
+
+  <script type="module">
+    // basicSetup unpacked manually so we can drop rectangularSelection +
+    // crosshairCursor, which would otherwise claim the Alt modifier.
+    import {
+      EditorView, keymap, lineNumbers, highlightActiveLineGutter,
+      highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine,
+    } from "@codemirror/view";
+    import { EditorState, Compartment } from "@codemirror/state";
+    import {
+      foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
+      bracketMatching, foldKeymap,
+    } from "@codemirror/language";
+    import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
+    import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+    import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+    import { lintKeymap } from "@codemirror/lint";
+    import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+    import { oneDark } from "@codemirror/theme-one-dark";
+
+    // Equivalent to codemirror's basicSetup, minus rectangularSelection/crosshairCursor.
+    const editorSetup = [
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      // Alt-click adds/removes cursors (Cmd-click kept working too).
+      EditorView.clickAddsSelectionRange.of(e => e.altKey || e.metaKey),
+      keymap.of([
+        ...closeBracketsKeymap,
+        ...defaultKeymap,
+        ...searchKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...completionKeymap,
+        ...lintKeymap,
+      ]),
+    ];
+
+    const defaultDoc = `# Markdown Source Editor
+
+A **CodeMirror 6** prototype with responsive light/dark mode.
+
+## Features
+- Syntax highlighting for Markdown
+- Light / Dark / Auto theme switching
+- Auto mode follows your OS \`prefers-color-scheme\`
+
+\`\`\`js
+function hello(name) {
+  return \`Hello, \${name}!\`;
+}
+\`\`\`
+
+> Try switching your system theme while the toggle is on **Auto**.
+
+1. First item
+2. Second item
+3. Third item
+
+| Col A | Col B |
+| ----- | ----- |
+| 1     | 2     |
+
+[A link](https://codemirror.net) and ~~strikethrough~~.
+`;
+
+    // --- Persistence -----------------------------------------------------
+    // Restore the doc from localStorage on load; fall back to the demo doc.
+    const STORAGE_KEY = "cm6-markdown-doc";
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const doc = saved !== null ? saved : defaultDoc;
+
+    const persist = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        localStorage.setItem(STORAGE_KEY, update.state.doc.toString());
+      }
+    });
+
+    const themeConf = new Compartment();
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+
+    // Light theme tweaks so CM blends with the page chrome.
+    const lightTheme = EditorView.theme({
+      "&": { backgroundColor: "var(--bg)", color: "var(--fg)" },
+      ".cm-gutters": { backgroundColor: "var(--bg-elev)", color: "var(--fg-muted)", border: "none" },
+      ".cm-activeLine": { backgroundColor: "rgba(0,0,0,0.03)" },
+      ".cm-activeLineGutter": { backgroundColor: "rgba(0,0,0,0.05)" },
+      ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "#d7e3ff" },
+    }, { dark: false });
+
+    const themeExtension = (dark) => (dark ? oneDark : lightTheme);
+
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        extensions: [
+          editorSetup,
+          EditorView.lineWrapping,
+          markdown({ base: markdownLanguage }),
+          themeConf.of(themeExtension(mql.matches)),
+          persist,
+        ],
+      }),
+      parent: document.getElementById("editor"),
+    });
+
+    // --- Theme control ---------------------------------------------------
+    // light | dark | auto. Seed from URL hash (#light/#dark) for easy demos.
+    let mode = ["light", "dark", "auto"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "auto";
+    const statusEl = document.getElementById("status");
+    const buttons = [...document.querySelectorAll(".seg button")];
+
+    const resolvedDark = () => (mode === "auto" ? mql.matches : mode === "dark");
+
+    function applyTheme() {
+      const dark = resolvedDark();
+      document.documentElement.classList.remove("theme-light", "theme-dark");
+      if (mode !== "auto") document.documentElement.classList.add(dark ? "theme-dark" : "theme-light");
+      view.dispatch({ effects: themeConf.reconfigure(themeExtension(dark)) });
+      statusEl.textContent = mode === "auto" ? `auto (${dark ? "dark" : "light"})` : mode;
+      buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.theme === mode)));
+    }
+
+    buttons.forEach(b => b.addEventListener("click", () => { mode = b.dataset.theme; applyTheme(); }));
+    mql.addEventListener("change", () => { if (mode === "auto") applyTheme(); });
+
+    applyTheme();
+    view.focus();
+  </script>
+</body>
+</html>
