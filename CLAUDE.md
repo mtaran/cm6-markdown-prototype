@@ -61,6 +61,16 @@ manually.)
 merging your own PR as part of completing a task is expected. Committing
 directly to `main` is not the standard flow.
 
+### When a code decision needs the user's input — open a PR, don't merge
+
+When there's a code question or design decision the user needs to chime in on
+(e.g. choosing between alternative implementations), the **preferred** way to
+get their input is to open a PR so they can review the actual diffs nicely —
+rather than only describing the options in chat. In this case, push the branch
+and open the PR but **do not merge it**; lay out the trade-offs in the PR
+description and wait for the user to review and decide. This is the one
+exception to "merge your own PR" above.
+
 ## Commit early and often — a change isn't "done" until it's merged
 
 - Commit in small, logical increments rather than batching everything into one
