@@ -108,7 +108,10 @@
     /* Entity highlight: gold background on the text, plus a small "entity"
        label dropped into the gap below the line (the line gets extra
        padding-bottom to make room). */
-    .cm-entity-line { padding-bottom: 1.3em; }
+    /* Reserve room below a highlighted line for the label. Offsets use rem
+       (root = 14px) rather than em so they don't shrink with the label's own
+       smaller font-size — keeping the label clear of the text above it. */
+    .cm-entity-line { padding-bottom: 1.7rem; }
     .cm-entity-highlight {
       background-color: #ffd54a; /* gold */
       border-radius: 2px;
@@ -118,8 +121,8 @@
       content: "entity";
       position: absolute;
       left: 0;
-      top: 1.2em;
-      font-size: 0.7em;
+      top: 1.65rem;
+      font-size: 0.72rem;
       line-height: 1.1;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       letter-spacing: .04em;
