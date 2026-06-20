@@ -107,24 +107,27 @@
 
     /* Entity highlight: gold background on the text, plus a small "entity"
        label dropped into the gap below the text.
-       The tall line-height lives on the inline highlight span (not the line),
-       so a line box's height grows only on the wrapped row(s) the highlight
-       actually sits on — other rows of the same logical line stay normal —
-       and that row gains leading below its text for the label to sit in. */
+       The span is inline-block with a margin-bottom: a line box's height counts
+       the inline-block's *margin box*, so the extra space lands only BELOW the
+       text on the row(s) the highlight sits on (a tall line-height would add it
+       symmetrically, above and below). Margin is transparent, so the gold stays
+       tight to the text; the label drops into the margin space. Only the
+       wrapped row(s) the highlight actually touches grow. */
     .cm-entity-highlight {
       background-color: #ffd54a; /* gold */
       border-radius: 2px;
       position: relative;
-      line-height: 2.8;
+      display: inline-block;
+      line-height: 1.35;
+      margin-bottom: 1.6rem;
     }
     .cm-entity-highlight::after {
       content: "entity";
       position: absolute;
       left: 0;
-      /* Sit just below the text glyphs of this row: 50% is the vertical centre
-         of the (tall) inline box, + ~0.6em reaches past the glyph bottom into
-         the leading. Self-adjusts per wrapped row. */
-      top: calc(50% + 0.6em);
+      /* Sit just below the text box (top: 100%) in the margin space below. */
+      top: 100%;
+      margin-top: 0.1rem;
       font-size: 0.72rem;
       line-height: 1.1;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -338,8 +341,8 @@ function hello(name) {
 
     // --- Entity highlights ----------------------------------------------
     // A persistent decoration (kept in a StateField so it maps through edits).
-    // Each highlight is a gold mark on its text; its CSS gives the span a tall
-    // line-height so the wrapped row it sits on has room for the label below.
+    // Each highlight is a gold mark on its text; its CSS makes the span an
+    // inline-block with a margin-bottom so the row it sits on has room below.
     const highlightMark = Decoration.mark({ class: "cm-entity-highlight" });
     const addHighlights = StateEffect.define();
     const removeHighlights = StateEffect.define();
