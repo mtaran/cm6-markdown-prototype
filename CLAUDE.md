@@ -61,6 +61,27 @@ manually.)
 merging your own PR as part of completing a task is expected. Committing
 directly to `main` is not the standard flow.
 
+### Delivery pitfalls — read before every PR
+
+These have bitten repeatedly; avoid them:
+
+- **Start each task from a worktree freshly branched off the latest
+  `origin/main` — never reuse a worktree (or branch) left over from a previous
+  task.** After a squash-merge, your old local branch still holds the
+  *unsquashed* commit, so it has diverged from `main`'s history; building the
+  next change on top of it produces avoidable merge conflicts. If you're
+  continuing in an existing worktree, first `ExitWorktree` and `EnterWorktree`
+  again (or otherwise branch from `origin/main`) so you start from a clean base.
+  Before your first commit, confirm `git log -1 origin/main` matches the merge
+  commit of any work you just shipped.
+- **Never pipe `gh pr merge` (or `git push --delete`) into `tail`/`head`/etc.,
+  and never chain it with `&&` after such a pipe.** A pipe reports the exit
+  status of the *last* command (`tail`), masking a merge failure, so the chain
+  proceeds and you delete a branch whose PR never merged. Run `gh pr merge` as
+  its own standalone command, check that it actually succeeded (or verify with
+  `gh pr view <n> --json state,mergeCommit`), and only then delete the branch
+  and fast-forward the primary checkout.
+
 ## Commit early and often — a change isn't "done" until it's merged
 
 - Commit in small, logical increments rather than batching everything into one
