@@ -107,16 +107,15 @@
 
     /* Entity highlight: gold background on the text, plus a small "entity"
        label dropped into the gap below the text.
-       A highlighted line gets a taller line-height so EVERY visual row (the
-       logical line wraps, so padding-bottom on the block would only space the
-       last row) carries extra leading below its text for the label to sit in.
-       The selector doubles up both classes (.cm-line.cm-entity-line) so it
-       outranks CodeMirror's own `.cm-line` rule injected later. */
-    .cm-line.cm-entity-line { line-height: 2.8; }
+       The tall line-height lives on the inline highlight span (not the line),
+       so a line box's height grows only on the wrapped row(s) the highlight
+       actually sits on — other rows of the same logical line stay normal —
+       and that row gains leading below its text for the label to sit in. */
     .cm-entity-highlight {
       background-color: #ffd54a; /* gold */
       border-radius: 2px;
       position: relative;
+      line-height: 2.8;
     }
     .cm-entity-highlight::after {
       content: "entity";
@@ -339,10 +338,9 @@ function hello(name) {
 
     // --- Entity highlights ----------------------------------------------
     // A persistent decoration (kept in a StateField so it maps through edits).
-    // Each highlight applies a gold mark to its text plus a line decoration on
-    // every line it touches so the "entity" label has room below the text.
+    // Each highlight is a gold mark on its text; its CSS gives the span a tall
+    // line-height so the wrapped row it sits on has room for the label below.
     const highlightMark = Decoration.mark({ class: "cm-entity-highlight" });
-    const highlightLine = Decoration.line({ class: "cm-entity-line" });
     const addHighlights = StateEffect.define();
 
     const highlightField = StateField.define({
@@ -351,21 +349,9 @@ function hello(name) {
         deco = deco.map(tr.changes);
         for (const e of tr.effects) {
           if (!e.is(addHighlights)) continue;
-          const adds = [];
-          const lineStarts = new Set();
-          for (const { from, to } of e.value) {
-            if (from >= to) continue;
-            adds.push(highlightMark.range(from, to));
-            for (let pos = from; pos <= to;) {
-              const line = tr.state.doc.lineAt(pos);
-              if (!lineStarts.has(line.from)) {
-                lineStarts.add(line.from);
-                adds.push(highlightLine.range(line.from));
-              }
-              if (line.to >= to) break;
-              pos = line.to + 1;
-            }
-          }
+          const adds = e.value
+            .filter(({ from, to }) => from < to)
+            .map(({ from, to }) => highlightMark.range(from, to));
           deco = deco.update({ add: adds, sort: true });
         }
         return deco;
