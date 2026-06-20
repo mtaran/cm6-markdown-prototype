@@ -233,12 +233,35 @@ function hello(name) {
     // --- Persistence -----------------------------------------------------
     // Restore the doc from localStorage on load; fall back to the demo doc.
     const STORAGE_KEY = "cm6-markdown-doc";
+    const HIGHLIGHTS_KEY = "cm6-markdown-highlights";
     const saved = localStorage.getItem(STORAGE_KEY);
     const doc = saved !== null ? saved : defaultDoc;
+
+    // Saved entity highlights as [from, to] pairs (positions into the doc).
+    // The highlightField (defined below) restores them in its create().
+    let savedHighlights = [];
+    try {
+      const raw = localStorage.getItem(HIGHLIGHTS_KEY);
+      if (raw) savedHighlights = JSON.parse(raw);
+    } catch { savedHighlights = []; }
+
+    // Read the current highlight ranges out of the field as [from, to] pairs.
+    const serializeHighlights = (state) => {
+      const ranges = [];
+      for (let i = state.field(highlightField).iter(); i.value; i.next()) {
+        ranges.push([i.from, i.to]);
+      }
+      return ranges;
+    };
 
     const persist = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         localStorage.setItem(STORAGE_KEY, update.state.doc.toString());
+      }
+      // The field returns a new DecorationSet whenever highlights are added,
+      // removed, or shifted by an edit; persist on that identity change.
+      if (update.startState.field(highlightField) !== update.state.field(highlightField)) {
+        localStorage.setItem(HIGHLIGHTS_KEY, JSON.stringify(serializeHighlights(update.state)));
       }
     });
 
@@ -351,7 +374,16 @@ function hello(name) {
     const overlaps = (aFrom, aTo, bFrom, bTo) => aFrom < bTo && bFrom < aTo;
 
     const highlightField = StateField.define({
-      create() { return Decoration.none; },
+      // Restore highlights saved in localStorage, dropping any range that no
+      // longer fits the (possibly externally changed) document.
+      create(state) {
+        const n = state.doc.length;
+        const adds = (Array.isArray(savedHighlights) ? savedHighlights : [])
+          .filter((r) => Array.isArray(r) && Number.isInteger(r[0]) &&
+            Number.isInteger(r[1]) && r[0] < r[1] && r[0] >= 0 && r[1] <= n)
+          .map(([from, to]) => highlightMark.range(from, to));
+        return Decoration.none.update({ add: adds, sort: true });
+      },
       update(deco, tr) {
         deco = deco.map(tr.changes);
         for (const e of tr.effects) {
