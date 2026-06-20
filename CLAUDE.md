@@ -33,6 +33,21 @@ bracket matching, autocompletion, search). When in doubt, leave it out. Prefer a
 short bullet per feature over prose; no "Running"/"Implementation notes"
 boilerplate unless it earns its place.
 
+## Standard delivery flow: branch → PR → merge
+
+Every change ships through a pull request. This is the default for **every**
+change — do not ask which delivery method to use:
+
+1. Create a feature branch.
+2. Commit the change (including any required `README.md` update — see above).
+3. Push the branch to `origin`.
+4. Open a PR with `gh`.
+5. Merge the PR (squash) and delete the branch.
+
+**Code review happens post-merge**, not as a blocking gate before merge, so
+merging your own PR as part of completing a task is expected. Committing
+directly to `main` is not the standard flow.
+
 ## Commit early and often — a change isn't "done" until it's merged
 
 - Commit in small, logical increments rather than batching everything into one
