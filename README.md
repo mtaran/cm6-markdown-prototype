@@ -12,7 +12,8 @@ needs an internet connection.
 - **Command / insert modes** — command mode (default) is a read-only,
   word-oriented view; press **`i`** for insert mode (normal editing, warm
   background) and **`Esc`** to return. The current mode shows in a chip in the
-  top-right.
+  top-right. Switching to insert keeps the command-mode selection, so it's ready
+  to replace or edit.
   - **Left/Right** move by word and select it; **Up/Down** move the word
     selection between lines. **Alt** and **Cmd** behave the same as no modifier,
     and adding **Shift** to any arrow grows the selection outward — by a word
