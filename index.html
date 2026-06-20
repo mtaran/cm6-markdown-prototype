@@ -125,7 +125,7 @@
       foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
       bracketMatching, foldKeymap,
     } from "@codemirror/language";
-    import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
+    import { history, defaultKeymap, historyKeymap, selectGroupLeft, selectGroupRight } from "@codemirror/commands";
     import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
     import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
     import { lintKeymap } from "@codemirror/lint";
@@ -292,6 +292,9 @@ function hello(name) {
       Prec.high(keymap.of([
         { key: "ArrowLeft", run: selectPrevWord },
         { key: "ArrowRight", run: selectNextWord },
+        // Shift+Left/Right extend the selection by word (not by char).
+        { key: "Shift-ArrowLeft", run: selectGroupLeft },
+        { key: "Shift-ArrowRight", run: selectGroupRight },
         { key: "i", run: enterInsert },
       ])),
     ];
