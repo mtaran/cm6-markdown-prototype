@@ -22,7 +22,8 @@ needs an internet connection.
     and adding **Shift** to any arrow grows the selection outward — by a word
     (Left/Right) or a line (Up/Down).
   - The word under the cursor is selected, so its other occurrences are
-    highlighted; **Alt-click** toggles a word's selection.
+    highlighted; **Alt-click** toggles a word's selection. Clicking or
+    click-dragging snaps the selection to whole-word boundaries.
   - In insert mode, **Cmd+Left/Right** move by word (matching
     **Alt+Left/Right**) rather than jumping to the line start/end.
 - **Widget highlights** — attach a persistent colored highlight to text, with a
@@ -38,6 +39,8 @@ needs an internet connection.
   the cursor/selection. Highlights stick to their text through edits.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
   **Cmd-click**.
+- **No drag-and-drop** — dragging text within the editor or dropping external
+  content into it is disabled.
 - **Automatic light/dark theme** that follows the OS `prefers-color-scheme` and
   updates live when it changes.
 - **Local autosave** — the document and its widget highlights are persisted to

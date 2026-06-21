@@ -182,7 +182,7 @@
     // crosshairCursor, which would otherwise claim the Alt modifier.
     import {
       EditorView, keymap, lineNumbers, highlightActiveLineGutter,
-      highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine,
+      highlightSpecialChars, drawSelection, highlightActiveLine,
       Decoration,
     } from "@codemirror/view";
     import { EditorState, EditorSelection, Compartment, Prec, Transaction, StateField, StateEffect } from "@codemirror/state";
@@ -205,7 +205,14 @@
       history(),
       foldGutter(),
       drawSelection(),
-      dropCursor(),
+      // Drag-and-drop is disabled: block dragging selected text and dropping
+      // external content into the editor. (dragover returns true without
+      // preventDefault so CM doesn't mark the editor as a valid drop target.)
+      EditorView.domEventHandlers({
+        dragstart: (e) => { e.preventDefault(); return true; },
+        dragover: () => true,
+        drop: (e) => { e.preventDefault(); return true; },
+      }),
       EditorState.allowMultipleSelections.of(true),
       indentOnInput(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
@@ -408,17 +415,32 @@ function hello(name) {
       return true;
     };
 
-    // In command mode, snap any bare cursor (e.g. from a click or alt-click)
-    // to the whole word at that position so it reads as a word selection.
+    // In command mode, snap selections to whole words: a bare cursor (click or
+    // alt-click) becomes the word at that position, and a click-drag range grows
+    // each end out to its word boundary so dragging selects whole words (the same
+    // way a double-click-drag does).
     const snapToWords = EditorState.transactionFilter.of((tr) => {
       if (!tr.selection) return tr;
       let changed = false;
       const ranges = tr.newSelection.ranges.map((r) => {
-        if (!r.empty) return r;
-        const w = tr.state.wordAt(r.head);
-        if (!w) return r;
+        if (r.empty) {
+          const w = tr.state.wordAt(r.head);
+          if (!w) return r;
+          changed = true;
+          return EditorSelection.range(w.from, w.to);
+        }
+        // Non-empty (drag) range: extend each end to the word boundary it's in.
+        const a = tr.state.wordAt(r.from);
+        const b = tr.state.wordAt(r.to);
+        const from = a ? a.from : r.from;
+        const to = b ? b.to : r.to;
+        if (from === r.from && to === r.to) return r;
         changed = true;
-        return EditorSelection.range(w.from, w.to);
+        // Preserve the drag direction (which end is the head) so Shift-extend
+        // keeps growing from the right edge.
+        return r.anchor <= r.head
+          ? EditorSelection.range(from, to)
+          : EditorSelection.range(to, from);
       });
       if (!changed) return tr;
       const ev = tr.annotation(Transaction.userEvent);
