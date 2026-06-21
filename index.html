@@ -284,7 +284,7 @@ function hello(name) {
     const serializeHighlights = (state) => {
       const ranges = [];
       for (let i = state.field(highlightField).iter(); i.value; i.next()) {
-        ranges.push([i.from, i.to, markType.get(i.value) || "entity"]);
+        ranges.push([i.from, i.to, typeOf(i.value)]);
       }
       return ranges;
     };
@@ -470,16 +470,18 @@ function hello(name) {
       { id: "scale",   cmdKey: "s", insKey: "Mod-s" },
       { id: "req",     cmdKey: "r", insKey: "Mod-r" },
     ];
-    // One shared mark per type (reused so its identity maps back to a type), and
-    // a reverse lookup from a mark to its type id for serialization.
-    const widgetMarks = new Map();
-    const markType = new Map();
-    for (const t of WIDGET_TYPES) {
-      const mark = Decoration.mark({ class: `cm-hl cm-hl-${t.id}` });
-      widgetMarks.set(t.id, mark);
-      markType.set(mark, t.id);
-    }
+    // One shared mark per type. Each mark carries its own type id in its spec
+    // (`widgetType`), so the type travels *with* the decoration — there is a
+    // single source of truth for "what type is this highlight?" read the same
+    // way everywhere (serialize, restore, lookup) via `typeOf`. No parallel
+    // mark->type map to keep in sync.
+    const widgetMarks = new Map(
+      WIDGET_TYPES.map((t) => [t.id, Decoration.mark({ class: `cm-hl cm-hl-${t.id}`, widgetType: t.id })])
+    );
     const markFor = (type) => widgetMarks.get(type) || widgetMarks.get("entity");
+    // The type id stored on a decoration, falling back to entity for anything
+    // unrecognized (e.g. a legacy mark without the field).
+    const typeOf = (deco) => (deco && deco.spec && deco.spec.widgetType) || "entity";
 
     // addHighlights carries { type, ranges }; removeHighlights an array of ranges.
     const addHighlights = StateEffect.define();
@@ -524,7 +526,7 @@ function hello(name) {
     const typeAt = (state, r) => {
       let id = null;
       state.field(highlightField).between(r.from, r.to, (from, to, value) => {
-        id = markType.get(value) || "entity";
+        id = typeOf(value);
         return false;
       });
       return id;
