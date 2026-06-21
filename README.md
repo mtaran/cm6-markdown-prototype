@@ -25,16 +25,20 @@ needs an internet connection.
     highlighted; **Alt-click** toggles a word's selection.
   - In insert mode, **Cmd+Left/Right** move by word (matching
     **Alt+Left/Right**) rather than jumping to the line start/end.
-- **Entity highlights** — attach a persistent gold highlight to text, with a
-  small **"entity"** label shown in the gap below the line. In command mode
-  press **`e`** (or **`Cmd+e`**) to toggle the highlight on the current word
-  selection(s); in insert mode press **`Cmd+e`** to toggle it on the word(s) the
-  cursor is on. The same gesture over already-highlighted text removes it, and
-  **`Backspace`** / **`Cmd+Backspace`** remove the highlight under the
-  cursor/selection. Highlights stick to their text through edits.
+- **Widget highlights** — attach a persistent colored highlight to text, with a
+  small type label shown in the gap below the line. Six types, each with its own
+  color and toggle key: **entity** (gold) — **`e`** · **problem** (red) —
+  **`p`** · **action** (blue) — **`a`** · **ambig** (gray) — **`?`** ·
+  **scale** (purple) — **`s`** · **req** (green) — **`r`**. In command mode
+  press the type's key (or its **`Cmd+`** variant) to toggle that widget on the
+  current word selection(s); in insert mode press the **`Cmd+`** variant to
+  toggle it on the word(s) the cursor is on. Pressing a type's key over text
+  that already has that type removes it; pressing a different type's key
+  replaces it. **`Backspace`** / **`Cmd+Backspace`** remove the highlight under
+  the cursor/selection. Highlights stick to their text through edits.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
   **Cmd-click**.
 - **Automatic light/dark theme** that follows the OS `prefers-color-scheme` and
   updates live when it changes.
-- **Local autosave** — the document and its entity highlights are persisted to
+- **Local autosave** — the document and its widget highlights are persisted to
   `localStorage` and restored on reload.
