@@ -9,6 +9,9 @@ needs an internet connection.
 
 - **Markdown source editing** with GitHub-Flavored-Markdown highlighting.
 - **Line wrapping.**
+- **Tab indents** (and **Shift-Tab** dedents) in insert mode instead of moving
+  focus out of the editor; in read-only command mode Tab is swallowed so focus
+  stays put.
 - **Command / insert modes** — command mode (default) is a read-only,
   word-oriented view; press **`i`** for insert mode (normal editing, warm
   background) and **`Esc`** to return. The current mode shows in a chip in the
