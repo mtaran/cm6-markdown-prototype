@@ -165,7 +165,7 @@
       foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
       bracketMatching, foldKeymap,
     } from "@codemirror/language";
-    import { history, defaultKeymap, historyKeymap, cursorGroupLeft, cursorGroupRight, selectGroupLeft, selectGroupRight } from "@codemirror/commands";
+    import { history, defaultKeymap, historyKeymap, indentWithTab, cursorGroupLeft, cursorGroupRight, selectGroupLeft, selectGroupRight } from "@codemirror/commands";
     import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
     import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
     import { lintKeymap } from "@codemirror/lint";
@@ -199,6 +199,8 @@
         ...foldKeymap,
         ...completionKeymap,
         ...lintKeymap,
+        // Tab indents (Shift-Tab dedents) instead of moving focus out of the editor.
+        indentWithTab,
       ]),
     ];
 
@@ -532,6 +534,9 @@ function hello(name) {
         { key: "Backspace", run: unhighlightSelections },
         { key: "Mod-Backspace", run: unhighlightSelections },
         { key: "i", run: enterInsert },
+        // Capture Tab (read-only mode can't indent) so it stays in the editor
+        // rather than moving focus out.
+        { key: "Tab", run: () => true, shift: () => true },
       ])),
     ];
     const insertExtensions = [
