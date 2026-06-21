@@ -272,8 +272,8 @@ function hello(name) {
     const doc = saved !== null ? saved : defaultDoc;
 
     // Saved widget highlights as [from, to, type] triples (positions into the
-    // doc). Legacy [from, to] pairs (pre-multi-type) are read as "entity".
-    // The highlightField (defined below) restores them in its create().
+    // doc); the type is required. The highlightField (defined below) restores
+    // them in its create().
     let savedHighlights = [];
     try {
       const raw = localStorage.getItem(HIGHLIGHTS_KEY);
@@ -478,10 +478,9 @@ function hello(name) {
     const widgetMarks = new Map(
       WIDGET_TYPES.map((t) => [t.id, Decoration.mark({ class: `cm-hl cm-hl-${t.id}`, widgetType: t.id })])
     );
-    const markFor = (type) => widgetMarks.get(type) || widgetMarks.get("entity");
-    // The type id stored on a decoration, falling back to entity for anything
-    // unrecognized (e.g. a legacy mark without the field).
-    const typeOf = (deco) => (deco && deco.spec && deco.spec.widgetType) || "entity";
+    // The type id stored on a decoration's spec — the single source of truth for
+    // "what type is this highlight?", read the same way on serialize and lookup.
+    const typeOf = (deco) => deco.spec.widgetType;
 
     // addHighlights carries { type, ranges }; removeHighlights an array of ranges.
     const addHighlights = StateEffect.define();
@@ -491,14 +490,16 @@ function hello(name) {
     const overlaps = (aFrom, aTo, bFrom, bTo) => aFrom < bTo && bFrom < aTo;
 
     const highlightField = StateField.define({
-      // Restore highlights saved in localStorage, dropping any range that no
-      // longer fits the (possibly externally changed) document.
+      // Restore highlights saved in localStorage, dropping any entry without a
+      // recognized type or whose range no longer fits the (possibly externally
+      // changed) document.
       create(state) {
         const n = state.doc.length;
         const adds = (Array.isArray(savedHighlights) ? savedHighlights : [])
           .filter((r) => Array.isArray(r) && Number.isInteger(r[0]) &&
-            Number.isInteger(r[1]) && r[0] < r[1] && r[0] >= 0 && r[1] <= n)
-          .map(([from, to, type]) => markFor(type).range(from, to));
+            Number.isInteger(r[1]) && r[0] < r[1] && r[0] >= 0 && r[1] <= n &&
+            widgetMarks.has(r[2]))
+          .map(([from, to, type]) => widgetMarks.get(type).range(from, to));
         return Decoration.none.update({ add: adds, sort: true });
       },
       update(deco, tr) {
@@ -510,7 +511,7 @@ function hello(name) {
               filter: (from, to) => !rs.some((r) => overlaps(from, to, r.from, r.to)),
             });
           } else if (e.is(addHighlights)) {
-            const mark = markFor(e.value.type);
+            const mark = widgetMarks.get(e.value.type);
             const adds = e.value.ranges
               .filter(({ from, to }) => from < to)
               .map(({ from, to }) => mark.range(from, to));
