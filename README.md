@@ -37,6 +37,10 @@ needs an internet connection.
   that already has that type removes it; pressing a different type's key
   replaces it. **`Backspace`** / **`Cmd+Backspace`** remove the highlight under
   the cursor/selection. Highlights stick to their text through edits.
+- **Widget sidebar** — a right-hand bar with a section per widget type listing
+  the tagged text spans under it (with a per-type color swatch and count).
+  Clicking a span selects it in the editor. The list stays in sync as
+  highlights and text change.
 - **Multiple cursors** — add or remove a cursor with **Alt-click** or
   **Cmd-click**.
 - **No drag-and-drop** — dragging text within the editor or dropping external
