@@ -105,24 +105,24 @@
       html.insert-mode .cm-editor .cm-gutters { background-color: #2b2620 !important; }
     }
 
-    /* Entity highlight: gold background on the text, plus a small "entity"
-       label dropped into the gap below the text.
+    /* Widget highlights: a colored background on the text, plus a small type
+       label dropped into the gap below the text. Each widget type (entity,
+       problem, action, ambig, scale, req) shares this layout and differs only
+       in color and the label's text (set per-type below).
        The span is inline-block with a margin-bottom: a line box's height counts
        the inline-block's *margin box*, so the extra space lands only BELOW the
        text on the row(s) the highlight sits on (a tall line-height would add it
-       symmetrically, above and below). Margin is transparent, so the gold stays
+       symmetrically, above and below). Margin is transparent, so the color stays
        tight to the text; the label drops into the margin space. Only the
        wrapped row(s) the highlight actually touches grow. */
-    .cm-entity-highlight {
-      background-color: #ffd54a; /* gold */
+    .cm-hl {
       border-radius: 2px;
       position: relative;
       display: inline-block;
       line-height: 1.35;
       margin-bottom: 0.9rem;
     }
-    .cm-entity-highlight::after {
-      content: "entity";
+    .cm-hl::after {
       position: absolute;
       left: 0;
       /* Sit just below the text box (top: 100%) in the margin space below. */
@@ -132,16 +132,41 @@
       line-height: 1.1;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       letter-spacing: .04em;
-      background-color: #fff0a8; /* yellow */
-      color: #6b5300;
       padding: 0 4px;
       border-radius: 2px;
       white-space: nowrap;
       pointer-events: none;
     }
+
+    /* Per-type colors (light mode): a bright fill on the text and a paler
+       label chip beneath it. */
+    .cm-hl-entity  { background-color: #ffd54a; }
+    .cm-hl-entity::after  { content: "entity";  background-color: #fff0a8; color: #6b5300; }
+    .cm-hl-problem { background-color: #ffb3b3; }
+    .cm-hl-problem::after { content: "problem"; background-color: #ffd9d9; color: #8a1f1f; }
+    .cm-hl-action  { background-color: #a9c9ff; }
+    .cm-hl-action::after  { content: "action";  background-color: #d6e6ff; color: #1f3d8a; }
+    .cm-hl-ambig   { background-color: #d3d3d8; }
+    .cm-hl-ambig::after   { content: "ambig";   background-color: #e8e8ec; color: #4a4a52; }
+    .cm-hl-scale   { background-color: #d9b3ff; }
+    .cm-hl-scale::after   { content: "scale";   background-color: #ecd9ff; color: #5a2a8a; }
+    .cm-hl-req     { background-color: #a9e6b8; }
+    .cm-hl-req::after     { content: "req";     background-color: #d6f5de; color: #1f6b35; }
+
     @media (prefers-color-scheme: dark) {
-      .cm-entity-highlight { background-color: #b8902a; color: #1c1400; }
-      .cm-entity-highlight::after { background-color: #6b5300; color: #ffe9a8; }
+      /* Darker, muted fills with a dark text color for contrast. */
+      .cm-hl-entity  { background-color: #b8902a; color: #1c1400; }
+      .cm-hl-entity::after  { background-color: #6b5300; color: #ffe9a8; }
+      .cm-hl-problem { background-color: #c96a6a; color: #1c0000; }
+      .cm-hl-problem::after { background-color: #6b2a2a; color: #ffd9d9; }
+      .cm-hl-action  { background-color: #6a8ec9; color: #00081c; }
+      .cm-hl-action::after  { background-color: #2a3d6b; color: #d6e6ff; }
+      .cm-hl-ambig   { background-color: #9a9aa2; color: #16161a; }
+      .cm-hl-ambig::after   { background-color: #4a4a52; color: #e8e8ec; }
+      .cm-hl-scale   { background-color: #9a6ac9; color: #0e001c; }
+      .cm-hl-scale::after   { background-color: #4a2a6b; color: #ecd9ff; }
+      .cm-hl-req     { background-color: #6ac98a; color: #001c0a; }
+      .cm-hl-req::after     { background-color: #2a6b3d; color: #d6f5de; }
     }
   </style>
 </head>
@@ -239,7 +264,8 @@ function hello(name) {
     const saved = localStorage.getItem(STORAGE_KEY);
     const doc = saved !== null ? saved : defaultDoc;
 
-    // Saved entity highlights as [from, to] pairs (positions into the doc).
+    // Saved widget highlights as [from, to, type] triples (positions into the
+    // doc). Legacy [from, to] pairs (pre-multi-type) are read as "entity".
     // The highlightField (defined below) restores them in its create().
     let savedHighlights = [];
     try {
@@ -247,11 +273,11 @@ function hello(name) {
       if (raw) savedHighlights = JSON.parse(raw);
     } catch { savedHighlights = []; }
 
-    // Read the current highlight ranges out of the field as [from, to] pairs.
+    // Read the current highlight ranges out of the field as [from, to, type].
     const serializeHighlights = (state) => {
       const ranges = [];
       for (let i = state.field(highlightField).iter(); i.value; i.next()) {
-        ranges.push([i.from, i.to]);
+        ranges.push([i.from, i.to, markType.get(i.value) || "entity"]);
       }
       return ranges;
     };
@@ -405,11 +431,35 @@ function hello(name) {
       };
     });
 
-    // --- Entity highlights ----------------------------------------------
+    // --- Widget highlights ----------------------------------------------
     // A persistent decoration (kept in a StateField so it maps through edits).
-    // Each highlight is a gold mark on its text; its CSS makes the span an
-    // inline-block with a margin-bottom so the row it sits on has room below.
-    const highlightMark = Decoration.mark({ class: "cm-entity-highlight" });
+    // Each highlight is a colored mark on its text; its CSS makes the span an
+    // inline-block with a margin-bottom so the row it sits on has room below,
+    // where a per-type label is dropped.
+    //
+    // The available widget types. `cmdKey` toggles the type in command mode
+    // (read-only, so a bare letter is free); `insKey` toggles it in insert mode
+    // (where letters type text, so a modifier is required).
+    const WIDGET_TYPES = [
+      { id: "entity",  cmdKey: "e", insKey: "Mod-e" },
+      { id: "problem", cmdKey: "p", insKey: "Mod-p" },
+      { id: "action",  cmdKey: "a", insKey: "Mod-a" },
+      { id: "ambig",   cmdKey: "?", insKey: "Mod-?" },
+      { id: "scale",   cmdKey: "s", insKey: "Mod-s" },
+      { id: "req",     cmdKey: "r", insKey: "Mod-r" },
+    ];
+    // One shared mark per type (reused so its identity maps back to a type), and
+    // a reverse lookup from a mark to its type id for serialization.
+    const widgetMarks = new Map();
+    const markType = new Map();
+    for (const t of WIDGET_TYPES) {
+      const mark = Decoration.mark({ class: `cm-hl cm-hl-${t.id}` });
+      widgetMarks.set(t.id, mark);
+      markType.set(mark, t.id);
+    }
+    const markFor = (type) => widgetMarks.get(type) || widgetMarks.get("entity");
+
+    // addHighlights carries { type, ranges }; removeHighlights an array of ranges.
     const addHighlights = StateEffect.define();
     const removeHighlights = StateEffect.define();
 
@@ -424,22 +474,23 @@ function hello(name) {
         const adds = (Array.isArray(savedHighlights) ? savedHighlights : [])
           .filter((r) => Array.isArray(r) && Number.isInteger(r[0]) &&
             Number.isInteger(r[1]) && r[0] < r[1] && r[0] >= 0 && r[1] <= n)
-          .map(([from, to]) => highlightMark.range(from, to));
+          .map(([from, to, type]) => markFor(type).range(from, to));
         return Decoration.none.update({ add: adds, sort: true });
       },
       update(deco, tr) {
         deco = deco.map(tr.changes);
         for (const e of tr.effects) {
-          if (e.is(addHighlights)) {
-            const adds = e.value
-              .filter(({ from, to }) => from < to)
-              .map(({ from, to }) => highlightMark.range(from, to));
-            deco = deco.update({ add: adds, sort: true });
-          } else if (e.is(removeHighlights)) {
+          if (e.is(removeHighlights)) {
             const rs = e.value;
             deco = deco.update({
               filter: (from, to) => !rs.some((r) => overlaps(from, to, r.from, r.to)),
             });
+          } else if (e.is(addHighlights)) {
+            const mark = markFor(e.value.type);
+            const adds = e.value.ranges
+              .filter(({ from, to }) => from < to)
+              .map(({ from, to }) => mark.range(from, to));
+            deco = deco.update({ add: adds, sort: true });
           }
         }
         return deco;
@@ -447,12 +498,17 @@ function hello(name) {
       provide: (f) => EditorView.decorations.from(f),
     });
 
-    // Does any existing highlight overlap this range?
-    const rangeHighlighted = (state, r) => {
-      let hit = false;
-      state.field(highlightField).between(r.from, r.to, () => { hit = true; return false; });
-      return hit;
+    // The type id of the first highlight overlapping this range, or null.
+    const typeAt = (state, r) => {
+      let id = null;
+      state.field(highlightField).between(r.from, r.to, (from, to, value) => {
+        id = markType.get(value) || "entity";
+        return false;
+      });
+      return id;
     };
+    // Does any existing highlight overlap this range?
+    const rangeHighlighted = (state, r) => typeAt(state, r) !== null;
 
     // Target ranges for the gesture: the current selection(s) as-is in command
     // mode; in insert mode each range is grown to whole-word boundaries so a
@@ -474,14 +530,21 @@ function hello(name) {
       return ranges;
     };
 
-    // Toggle: remove the highlight where a target already has one, else add it.
-    const toggle = (v, targets) => {
+    // Toggle a widget type over the targets. A target already carrying this
+    // type is cleared; one carrying a different type is replaced; an unmarked
+    // one gets the type added. (remove runs before add so a replacement lands.)
+    const toggle = (v, targets, type) => {
       if (!targets.length) return false;
       const add = [], remove = [];
-      for (const r of targets) (rangeHighlighted(v.state, r) ? remove : add).push(r);
+      for (const r of targets) {
+        const cur = typeAt(v.state, r);
+        if (cur === type) { remove.push(r); }       // same type -> clear
+        else if (cur) { remove.push(r); add.push(r); } // other type -> replace
+        else { add.push(r); }                       // unmarked -> add
+      }
       const effects = [];
-      if (add.length) effects.push(addHighlights.of(add));
       if (remove.length) effects.push(removeHighlights.of(remove));
+      if (add.length) effects.push(addHighlights.of({ type, ranges: add }));
       v.dispatch({ effects });
       return true;
     };
@@ -495,10 +558,20 @@ function hello(name) {
       return true;
     };
 
-    const highlightSelections = (v) => toggle(v, selectionTargets(v.state));
-    const highlightWordsAtCursor = (v) => toggle(v, wordTargets(v.state));
     const unhighlightSelections = (v) => unhighlight(v, selectionTargets(v.state));
     const unhighlightWordsAtCursor = (v) => unhighlight(v, wordTargets(v.state));
+
+    // Per-type keymap entries: command mode toggles over the selection(s);
+    // insert mode toggles over the word(s) at the cursor. Command mode binds
+    // both the bare key and the modifier variant (matching the insert binding).
+    const commandHighlightKeys = WIDGET_TYPES.flatMap((t) => {
+      const run = (v) => toggle(v, selectionTargets(v.state), t.id);
+      return [{ key: t.cmdKey, run }, { key: t.insKey, run }];
+    });
+    const insertHighlightKeys = WIDGET_TYPES.map((t) => ({
+      key: t.insKey,
+      run: (v) => toggle(v, wordTargets(v.state), t.id),
+    }));
 
     function enterInsert() { setMode("insert"); return true; }
     function enterCommand() { setMode("command"); return true; }
@@ -526,10 +599,10 @@ function hello(name) {
         { key: "ArrowDown", run: selectWordDown, shift: extendLineDown },
         { key: "Alt-ArrowDown", run: selectWordDown, shift: extendLineDown },
         { key: "Mod-ArrowDown", run: selectWordDown, shift: extendLineDown },
-        // e (or Cmd+e, matching insert mode) toggles an entity Highlight on the
-        // current selection(s) — adds it, or removes it if already highlighted.
-        { key: "e", run: highlightSelections },
-        { key: "Mod-e", run: highlightSelections },
+        // Each widget type's key (e/p/a/?/s/r, or its Cmd+ variant) toggles
+        // that widget on the current selection(s) — adds it, replaces a
+        // different type, or removes it if already that type.
+        ...commandHighlightKeys,
         // Backspace / Cmd+Backspace remove the highlight on the selection(s).
         { key: "Backspace", run: unhighlightSelections },
         { key: "Mod-Backspace", run: unhighlightSelections },
@@ -542,10 +615,12 @@ function hello(name) {
     const insertExtensions = [
       Prec.high(keymap.of([
         { key: "Escape", run: enterCommand },
-        // Cmd+e toggles the highlight on the word(s) the cursor is on (adds, or
-        // removes if already highlighted). (Alt+e is a dead key on macOS — it
-        // starts an accent sequence — so it's unusable.)
-        { key: "Mod-e", run: highlightWordsAtCursor },
+        // Cmd+<type key> toggles that widget on the word(s) the cursor is on
+        // (adds, replaces a different type, or removes if already that type).
+        // A bare letter would type text here, so a modifier is required. (Alt+e
+        // is a dead key on macOS — it starts an accent sequence — so Alt is
+        // unusable; Cmd it is.)
+        ...insertHighlightKeys,
         // Backspace / Cmd+Backspace remove the highlight on the word at the
         // cursor when present; otherwise they fall through to normal deletion.
         { key: "Backspace", run: unhighlightWordsAtCursor },
